@@ -33,6 +33,13 @@ on:
   pull_request:
     branches: ["**"]
 
+# GitHub occasionally starts two runs for one push; the second would fail pushing the same
+# immutable ECR tag. One run per event+commit; the event is part of the key so a PR run
+# never cancels the main-branch run for the same SHA.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: true
+
 # ---------------------------------------------------------------------------
 # Job 1 — test
 # Runs on every push and every pull_request. Unchanged from Steps 1-16.
@@ -103,7 +110,8 @@ jobs:
   # ---------------------------------------------------------------------------
   build-and-push:
     name: Build and Push to ECR
-    runs-on: ubuntu-latest
+    # Native arm64 runner (free for public repos): builds the arm64 image without QEMU.
+    runs-on: ubuntu-24.04-arm
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -121,7 +129,7 @@ jobs:
 
       # Authenticate to AWS via OIDC — no static credentials.
       # The IAM role trust policy is scoped to exactly:
-      #   repo:DSurya11/feature-flag-service:ref:refs/heads/main
+      #   repo:DSurya11@162597218/feature-flag-service@1368152185:ref:refs/heads/main
       # Any other repo or branch cannot assume this role.
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -146,13 +154,26 @@ jobs:
           echo "ecr_registry=${ECR_REGISTRY}" >> $GITHUB_OUTPUT
           echo "ecr_repository=${ECR_REPOSITORY}" >> $GITHUB_OUTPUT
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        
+      # "Re-run" of a green build: the SHA tag is immutable and already in ECR, so skip the
+      # build instead of failing on the push. Trivy below still gates the existing image.
+      - name: Check if image already exists
+        id: exists
+        run: |
+          if aws ecr describe-images --region ap-south-1 \
+               --repository-name "${{ steps.meta.outputs.ecr_repository }}" \
+               --image-ids imageTag="${{ steps.meta.outputs.image_tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Image ${{ steps.meta.outputs.image_tag }} already in ECR - skipping build"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Docker Buildx
+        if: steps.exists.outputs.exists != 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
+        if: steps.exists.outputs.exists != 'true'
         run: |
           docker buildx build \
             --platform linux/arm64 \
@@ -232,36 +253,26 @@ jobs:
         run: |
           git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/DSurya11/idp-gitops.git env-config
 
-      # Update the image tag in the dev overlay kustomization.
-      # After Step 27 restructure, this targets overlays/dev/kustomization.yaml.
-      # Until then (flat structure), we fall back to api-deployment.yaml.
+      # Update newTag in the dev overlay; the Deployment and the migration Job both take
+      # their image from this one Kustomize images stanza.
       - name: Update image SHA in env-config
         env:
           NEW_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          ECR_IMAGE: 693906847772.dkr.ecr.ap-south-1.amazonaws.com/feature-flag-service
+          CHANGED_FILE: apps/feature-flag-service/overlays/dev/kustomization.yaml
         run: |
           cd env-config
-
-          # Detect whether env-config has been restructured (Step 27) or is still flat
-          if [ -f "apps/feature-flag-service/overlays/dev/kustomization.yaml" ]; then
-            echo "==> Kustomize overlay structure detected (post-Step-27)"
-            # Update the newTag field in the kustomization.yaml images stanza
-            sed -i "s|newTag:.*|newTag: ${NEW_TAG}|g" \
-              apps/feature-flag-service/overlays/dev/kustomization.yaml
-            CHANGED_FILE="apps/feature-flag-service/overlays/dev/kustomization.yaml"
-          else
-            echo "==> Flat structure detected (pre-Step-27)"
-            # Update the image field in the EKS manifests: the API Deployment and the
-            # DB migration Job must always run the same image.
-            # (api-deployment.yaml is the old kind/GHCR manifest and has no ECR image).
-            CHANGED_FILE="eks-api-deployment.yaml eks-db-migrate-job.yaml"
-            sed -i "s|image: ${ECR_IMAGE}:.*|image: ${ECR_IMAGE}:${NEW_TAG}|g" ${CHANGED_FILE}
-          fi
+          sed -i "s|newTag:.*|newTag: ${NEW_TAG}|g" "${CHANGED_FILE}"
 
           git config user.name "ff-idp-ci-bot[bot]"
           git config user.email "ff-idp-ci-bot[bot]@users.noreply.github.com"
-          git add ${CHANGED_FILE}
+          git add "${CHANGED_FILE}"
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "chore(deploy): update feature-flag-service image to ${NEW_TAG}"
-          git push origin main
-          echo "==> env-config updated: ${CHANGED_FILE} → ${ECR_IMAGE}:${NEW_TAG}"
+          # Other CI bots (idp-portal, template services) push to the same repo; if one
+          # lands first, rebase onto it (different files, no conflicts) and retry.
+          for i in 1 2 3; do
+            git push origin main && break
+            [ "$i" = 3 ] && exit 1
+            sleep $((i * 5)); git pull --rebase origin main
+          done
+          echo "==> env-config updated: ${CHANGED_FILE} -> ${NEW_TAG}"

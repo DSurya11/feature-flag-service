@@ -6,30 +6,28 @@ metadata:
   annotations:
     github.com/project-slug: DSurya11/feature-flag-service
   links:
-    - url: https://github.com/DSurya11/idp-gitops
-      title: Env Config Repo (GitOps)
-    - url: https://github.com/DSurya11/feature-flag-service/pkgs/container/feature-flag-service
-      title: Container Images (GHCR)
-    - url: http://localhost:8000/docs
-      title: API Docs (Swagger)
+    - url: https://github.com/DSurya11/idp-gitops/tree/main/apps/feature-flag-service
+      title: Deployment config (idp-gitops)
+    - url: https://ap-south-1.console.aws.amazon.com/ecr/repositories/private/693906847772/feature-flag-service?region=ap-south-1
+      title: Container images (ECR)
   tags:
     - fastapi
     - python
     - postgres
-    - redis
+    - valkey
 spec:
   type: service
   lifecycle: experimental
   owner: DSurya11
   dependsOn:
     - resource:default/feature-flag-postgres
-    - resource:default/feature-flag-redis
+    - resource:default/feature-flag-cache
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
   name: feature-flag-postgres
-  description: Neon-hosted Postgres database for the Feature Flag Service, provisioned via Terraform
+  description: Amazon RDS PostgreSQL (db.t3.micro, in-VPC), provisioned by idp-infra/20-data
 spec:
   type: database
   owner: DSurya11
@@ -37,8 +35,8 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
-  name: feature-flag-redis
-  description: In-cluster Redis cache for flag evaluation
+  name: feature-flag-cache
+  description: Amazon ElastiCache Valkey (Redis-compatible) flag cache, provisioned by idp-infra/30-cluster
 spec:
   type: cache
   owner: DSurya11
