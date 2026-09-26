@@ -24,6 +24,8 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+# SQLite files the tests create in the repo root (sqlite:///./test_*.db)
+test_*.db
 
 # Mypy
 .mypy_cache/
