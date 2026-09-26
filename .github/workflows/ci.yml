@@ -11,7 +11,7 @@
 #                           GitHub App installation token (no long-lived PAT)
 #
 # Auth strategy (zero static credentials):
-#   AWS access:    OIDC → IAM role ff-idp-github-ci (no AWS_ACCESS_KEY_ID anywhere)
+#   AWS access:    OIDC → IAM role idp-github-ci (no AWS_ACCESS_KEY_ID anywhere)
 #   env-config writes: GitHub App installation token generated per-run
 #                      via actions/create-github-app-token@v1
 #                      (App: ff-idp-ci-bot, registered under DSurya11)
@@ -121,12 +121,12 @@ jobs:
 
       # Authenticate to AWS via OIDC — no static credentials.
       # The IAM role trust policy is scoped to exactly:
-      #   repo:DSurya11/Feature-Flag-Service:ref:refs/heads/main
+      #   repo:DSurya11/feature-flag-service:ref:refs/heads/main
       # Any other repo or branch cannot assume this role.
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::693906847772:role/ff-idp-github-ci
+          role-to-assume: arn:aws:iam::693906847772:role/idp-github-ci
           aws-region: ap-south-1
 
       - name: Login to Amazon ECR
@@ -221,16 +221,16 @@ jobs:
         uses: actions/create-github-app-token@v1
         with:
           # GitHub App registered under DSurya11 with contents:write on
-          # feature-flag-service-env-config repo only.
+          # idp-gitops repo only.
           # App ID and private key are GitHub Actions secrets (not AWS secrets).
           app-id: ${{ secrets.FF_IDP_CI_BOT_APP_ID }}
           private-key: ${{ secrets.FF_IDP_CI_BOT_PRIVATE_KEY }}
           # Scope token to only the env-config repo
-          repositories: feature-flag-service-env-config
+          repositories: idp-gitops
 
       - name: Clone env-config repo
         run: |
-          git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/DSurya11/feature-flag-service-env-config.git env-config
+          git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/DSurya11/idp-gitops.git env-config
 
       # Update the image tag in the dev overlay kustomization.
       # After Step 27 restructure, this targets overlays/dev/kustomization.yaml.

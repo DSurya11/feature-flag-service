@@ -20,13 +20,13 @@ Developer
    │
    │ git push
    ▼
-Feature-Flag-Service (app repo)
+feature-flag-service (app repo)
    │
    │ GitHub Actions CI
    │  ├─ test (ephemeral Postgres + Redis, real Alembic migration from empty DB)
    │  └─ build & push image → GHCR (tagged by commit SHA)
    ▼
-feature-flag-service-env-config (env-config repo)
+idp-gitops (env-config repo)
    │  image tag auto-updated by CI on every push to main
    ▼
 Argo CD (in-cluster, watching env-config repo)
@@ -149,7 +149,7 @@ valuable single artifact in the project: real data overturning an untested assum
 
 - **Local Setup:** Check [Setup](#setup) for local `.env` and `uvicorn` setup.
 - **Cluster Deployment:** Check [Step 10 — Kubernetes](#step-10--kubernetes-kind-cluster) for creating the cluster, applying namespaces, and imperatively creating the secrets.
-- **GitOps (Argo CD):** Ensure ArgoCD is installed and the `feature-flag-service-env-config` repo is synced.
+- **GitOps (Argo CD):** Ensure ArgoCD is installed and the `idp-gitops` repo is synced.
 - **Port Forwards:**
   - Argo CD UI: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
   - Grafana UI: `kubectl port-forward svc/kube-prometheus-stack-grafana -n monitoring 3001:80`
@@ -398,7 +398,7 @@ Terraform manages the existing Neon project via `terraform import`, adopting an 
 
 ## Step 13 — GitOps (Argo CD)
 
-Argo CD handles automated synchronization of Kubernetes manifests from the `feature-flag-service-env-config` repository to the cluster.
+Argo CD handles automated synchronization of Kubernetes manifests from the `idp-gitops` repository to the cluster.
 
 - **Automated Sync & Prune:** If a manifest is deleted from Git, the resource is deleted from the cluster.
 - **Self-Healing:** Manual drifts (e.g., `kubectl scale deployment ... --replicas=5`) are automatically detected and reverted back to the Git-declared state (e.g., `replicas: 2`).
