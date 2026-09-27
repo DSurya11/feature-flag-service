@@ -1,0 +1,15 @@
+# Weekly dependency PRs; CI tests each one. Actions are pinned by SHA and Dependabot keeps
+# the pins current (PLATFORM_REVIEW F11).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+    groups: {actions: {patterns: ["*"]}}
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly}
+    groups: {python: {patterns: ["*"], update-types: [minor, patch]}}
+  - package-ecosystem: docker
+    directory: /
+    schedule: {interval: weekly}
