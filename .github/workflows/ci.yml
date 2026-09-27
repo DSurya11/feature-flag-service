@@ -14,7 +14,7 @@
 #   AWS access:    OIDC → IAM role idp-github-ci (no AWS_ACCESS_KEY_ID anywhere)
 #   env-config writes: GitHub App installation token generated per-run
 #                      via actions/create-github-app-token
-#                      (App: idp-ci-bot, registered under DSurya11)
+#                      (App: idp-ci-bot, owned by org surya-idp)
 #
 # Image tagging strategy:
 #   ECR registry:  693906847772.dkr.ecr.ap-south-1.amazonaws.com/feature-flag-service
@@ -129,7 +129,7 @@ jobs:
 
       # Authenticate to AWS via OIDC — no static credentials.
       # The IAM role trust policy is scoped to exactly:
-      #   repo:DSurya11@162597218/feature-flag-service@1368152185:ref:refs/heads/main
+      #   repo:surya-idp@334455734/feature-flag-service@1368152185:ref:refs/heads/main
       # Any other repo or branch cannot assume this role.
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
@@ -241,7 +241,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         with:
-          # GitHub App registered under DSurya11 with contents:write on
+          # GitHub App idp-ci-bot (org surya-idp) with contents:write on
           # idp-gitops repo only.
           # App ID and private key are GitHub Actions secrets (not AWS secrets).
           app-id: ${{ secrets.FF_IDP_CI_BOT_APP_ID }}
@@ -251,7 +251,7 @@ jobs:
 
       - name: Clone env-config repo
         run: |
-          git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/DSurya11/idp-gitops.git env-config
+          git clone https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/surya-idp/idp-gitops.git env-config
 
       # Update newTag in the dev overlay; the Deployment and the migration Job both take
       # their image from this one Kustomize images stanza.

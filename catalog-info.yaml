@@ -4,9 +4,9 @@ metadata:
   name: feature-flag-service
   description: Feature flag evaluation service with percentage rollouts, targeting rules, and audit logging
   annotations:
-    github.com/project-slug: DSurya11/feature-flag-service
+    github.com/project-slug: surya-idp/feature-flag-service
   links:
-    - url: https://github.com/DSurya11/idp-gitops/tree/main/apps/feature-flag-service
+    - url: https://github.com/surya-idp/idp-gitops/tree/main/apps/feature-flag-service
       title: Deployment config (idp-gitops)
     - url: https://ap-south-1.console.aws.amazon.com/ecr/repositories/private/693906847772/feature-flag-service?region=ap-south-1
       title: Container images (ECR)
